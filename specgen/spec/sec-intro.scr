@@ -1,0 +1,185 @@
+@section[:title "Introduction"]
+
+@p{This is the language specification for Quil, a language for hybrid
+classical/quantum computations.}
+
+@p{Quil is an instruction-based language; each line of a Quil program
+generally corresponds to a single, discrete action. Despite its
+resemblance, Quil is @emph{not} an assembly language.}
+
+@aside{An @emph{assembly language} is a textual format for the machine
+code of a specific computer architecture.}
+
+@p{This is an example Quil program which simulates a coin flip:
+
+@clist{
+DECLARE ro BIT[1]
+H 0
+MEASURE 0 ro[0]
+}
+
+Here, we can see the use of both classical data and quantum data. The
+qubit numbered @c{0} is prepared in a uniform superposition by the
+Hadamard gate @c{H}, and then measured in the computational basis,
+depositing the resulting bit into a classic bit register named @c{ro}.
+}
+
+@section[:title "Structure of a Quil Program"]
+
+@subsection[:title "Main Program Elements"]
+
+@p{A Quil program consists of declarations, directives, and
+instructions.}
+
+@syntax[:name "Program"]{
+@rep{@ms{Program Element}}
+}
+
+@syntax[:name "Program Element"]{
+@ms{Declaration} | @ms{Directive} |  @ms{Instruction}
+}
+
+@p{A @emph{declaration} typically specifies the existence of a named
+object, like classical memory registers.}
+
+@syntax[:name "Declaration"]{
+     @ms{Gate Definition}
+@alt @ms{Circuit Definition}
+@alt @ms{Classical Memory Declaration}
+}
+
+@p{A @emph{directive} specifies information to software processing
+Quil, such as the @quil{INCLIDE} directive for including files.}
+
+@syntax[:name "Directive"]{
+     @ms{Pragma}
+@alt @ms{Label}
+@alt @ms{File Include}
+}
+
+@p{An @emph{instruction} is an actual run-time executable effect.}
+
+@syntax[:name "Instruction"]{
+     @ms{Gate Application}
+@alt @ms{Measurement Instruction}
+@alt @ms{Circuit Application}
+@alt @ms{Classical Memory Instruction}
+@alt @ms{Reset Instruction}
+@alt @ms{Wait Instruction}
+@alt @ms{Branch Instruction}
+@alt @ms{Halt Instruction}
+}
+
+@subsection[:title "Comments"]
+
+@p{Comments may exist syntactically, but do not change the semantics
+of the program. Text including and following the '@c{#}' character are ignored up
+to the end of the line.}
+
+@syntax[:name "Comment"]{
+#@rep{[^\n]}
+}
+
+@section[:title "Syntactic Rudiments"]
+
+@p{Before proceeding to describe each component of a Quil program, it
+will be useful to establish a few common pieces of syntax which will
+be used later.}
+
+@p{A newline is a single ASCII carriage return.}
+
+@syntax[:name "Newline"]{
+@syntax-descriptive{ASCII 10}
+}
+
+@p{An indent is defined as exactly four spaces at the start of a line.}
+
+@syntax[:name "Indent"]{
+@group{@syntax-descriptive{start of file} @alt @ms{Newline}}
+@syntax-descriptive{ASCII 32}
+@syntax-descriptive{ASCII 32}
+@syntax-descriptive{ASCII 32}
+@syntax-descriptive{ASCII 32}
+}
+
+@p{Non-negative integers are written as usual. Leading zeros do not
+change the interpretation of these numeric literals.}
+
+@syntax[:name "Non-Negative Integer"]{
+@rep[:min 1]{[0-9]}
+}
+
+@p{Strings are characters bounded by double-quotation mark characters
+'@c{"}'. If a double-quotation mark should be used within the string,
+it must be escaped with a backslash, like so: '@c{\"}'. Similarly, if
+a backslash should be used within a string, it must be escaped, like
+so: '@c{\\}'.}
+
+@syntax[:name "String"]{
+"@rep{@group{[^\"] | \" | \\}}"
+}
+
+@p{Identifiers in Quil are alphanumeric Latin characters, along with
+hyphens and underscores. Identifiers may neither start not end with a
+hyphen '@c{-}'.}
+
+@syntax[:name "Identifier"]{
+[A-Za-z_] @alt [A-Za-z_]@rep{[A-Za-z0-9\-_]}[A-Za-z0-9_]
+}
+
+@p{The following identifiers are reserved:
+
+@clist{
+DEFGATE DEFCIRCUIT PRAGMA ...
+}
+}
+
+@section[:title "Quantum Gates"]
+
+@subsection[:title "General Remarks"]
+
+@p{Simple and parametric gates}
+
+@subsection[:title "Quantum Gate Definitions"]
+
+@subsubsection[:title "Structure of a Gate Definition"]
+
+@p{A gate definition in general has the following (informal) structure:}
+
+@clist{
+DEFGATE <name>(<params>) AS <kind>:
+    <body>
+}
+
+@p{Here, the @c{<name>} names the gate, the @c{<kind>} states how we
+are defining the gate, and the @c{<body>} depends on the @c{kind}. For
+certain gates, @c{<params>} specifies parameters to the gate.}
+
+@syntax[:name "Gate Definition"]{
+     @ms{Matrix Gate Definition}
+@alt @ms{Permutation Gate Definition}
+@alt @ms{Pauli Gate Definition}
+}
+
+@subsubsection[:title "Definition by Matrix"]
+
+@subsubsection[:title "Definition by Permutation"]
+
+@syntax[:name "Permutation Gate Definition"]{
+DEFGATE @ms{Identifier} AS PERMUTATION:@ms{Newline}@ms{Indent}@ms{Permutation}
+}
+
+@subsubsection[:title "Definition by Pauli Sum"]
+
+@subsection[:title "Standard Gate Definitions"]
+
+@subsection[:title "Quantum Gate Applications"]
+
+@subsubsection[:title "Gate Modifiers"]
+
+
+
+
+@section[:title "Test Area"]
+
+@p{Let @m{a,b,c\in\mathbb{R}} in @dm{ax^2+bx+c=0,} which is a quadratic equation whose solutions are @dm{x=\frac{-b\pm\sqrt{b^2-4ac}}{2a}.}}
