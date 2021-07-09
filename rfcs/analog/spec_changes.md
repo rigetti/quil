@@ -11,30 +11,29 @@ Frame :: Qubit+ FrameName
 
 A frame encapsulates any rotating frame relative to which control/readout
 waveforms may be defined. For the purposes of scheduling and execution on
-possibly heterogenous hardware, frames are specified with respect to a specific
+possibly heterogeneous hardware, frames are specified with respect to a specific
 list of qubits. Thus, `0 1 "cz"` is the "cz" frame on qubits 0 and 1. The order
 of the qubits matters. In particular, the above frame may differ from `1 0
 "cz"`.
 
 #### DEFFRAME
 
-Quilt itself has no built-in frames. Frames must be defined using the `DEFFRAME`
+Frames are the basic resources manipulated by Quilt programs, and in
+any implementation will involve a certain amount of coupling with the
+underlying control hardware. As such, Quilt itself has no built-in
+frames. Native or canonical frame definitions may be provided by a
+hardware vendor, and are exposed to Quilt programs via the `DEFFRAME`
 directive.
 
 ```
 DefFrame :: DEFFRAME Frame (: FrameSpec+ )?
 FrameSpec :: Indent FrameAttr : ( Expression | String )
-FrameAttr :: SAMPLE-RATE | INITIAL-FREQUENCY | DIRECTION | HARDWARE-OBJECT
+FrameAttr :: Identifier
 ```
 
-All frames used in a program must have a corresponding top-level definition.
-
-
-Before execution, a Quilt program is linked with a specific system of control
-hardware, and frames are mapped to suitable hardware objects (cf. the
-`HARDWARE-OBJECT` frame attribute below). Native or canonical frame definitions may be
-provided by a hardware vendor. Some examples of Rigetti's canonical frames are
-listed below, but this is subject to change.
+All frames used in a program must have a corresponding top-level
+definition. Some examples of Rigetti's canonical frames are listed
+below, but this is subject to change.
 
 Examples (names only):
 ```
@@ -46,44 +45,87 @@ Examples (names only):
 "out" # eg. for the capture line
 ```
 
+Relevant characteristics of a particular frame are indicated in the
+body of a `DEFFRAME` by way of frame attributes. Certain of these
+attributes are standardized, whereas others are hardware or
+implementation specific. The specific set of required and optional
+frame attributes is implementation specific.
 
-##### Frame Attributes
+Here is an example of a full frame definition:
 
-Frame attributes represent quantities associated with a given frame which need not be specified by the programmer, but which are ultimately required to fully link and execute a Quilt program on a physical device.
+```
+DEFFRAME 0 1 "cz":
+    DIRECTION: "tx"
+    INITIAL-FREQUENCY: 220487409.16137844
+    CENTER-FREQUENCY: 375000000.0
+    HARDWARE-OBJECT: "q0_ff"
+    SAMPLE-RATE: 1000000000.0
+```
+
+
+##### Standard Frame Attributes
+
+All frames have an associated frequency and sample rate. Additionally, operations on frames must respect a certain sort of type safety: namely, certain frames can have `PULSE` applied, others can have `CAPTURE` applied, and the two are assumed to be exclusive.
 
 - `SAMPLE-RATE` is a floating point number indicating the rate (in Hz) of the digital-to-analog converter on the control hardware associated with this frame.
 - `INITIAL-FREQUENCY` is a floating point number indicating the initial frame frequency.
-- `DIRECTION` is one of `"tx"` or `"rx"`.
-- `HARDWARE-OBJECT` is a string indicating the (implementation-specific) hardware object that the frame is associated with.
+- `DIRECTION` is one of `"tx"` or `"rx"`, and indicates whether the frame is available for pulse operations (`"tx"`) or capture operations (`"rx"`).
 
-### Waveforms
+
+##### Rigetti Native Frame Attributes
+
+Frame attributes represent quantities associated with a given frame which need not be specified by the programmer, but which are ultimately required to fully link and execute a Quilt program on a physical device.
+
+- `HARDWARE-OBJECT` is a string indicating the (implementation-specific) hardware object that the frame is associated with, used for program linkage.
+- `CENTER-FREQUENCY` is an optional attribute, consisting of a floating point value indicating the frame frequency which should be considered the "center" for the purposes of digital-to-analog or analog-to-digital conversion.
+
+### Waveform References
 
 ```
 Waveform :: Name
-Waveform :: flat ( duration: Expression, iq: Expression )
-Waveform :: gaussian ( duration: Expression, fwhm: Expression, t0: Expression )
-Waveform :: draggaussian ( duration: Expression, fwhm: Expression, t0: Expression,
-    anh: Expression, alpha: Expression )
-Waveform :: erfsquare ( duration: Expression, risetime: Expression,
-    padleft: Expression, padright: Expression )
+Waveform :: Name '(' NamedParam ( , NamedParam )* ')'
+NamedParam :: Name : Expression
 ```
 
-Waveforms are referenced either by name or by a built-in waveform generator.
+There are two sorts of waveform references present in Quilt. Custom
+waveforms, defined with `DEFWAVEFORM`, are referenced directly by
+name. Quilt implementations may also support a number of "template
+waveforms", which are denoted using functional notation.  For example
+`foo(a: 1, b: 2)` denotes a template waveform named `foo` with
+template parameter `a` set to `1` and `b` set to `2`.
 
-The built-in waveform generators are:
-- `flat(duration, iq)` creates a flat waveform where:
+Although the values of template parameters may be expressions in
+general, specific implementations of Quilt are free to restrict this
+in a suitable fashion (e.g. to literal real or complex values). 
+
+#### Rigetti's Template Waveforms
+
+Some examples of the template waveforms made available by Rigetti include:
+
+```
+Waveform :: flat '(' duration: Expression, iq: Expression ')'
+Waveform :: gaussian '(' duration: Expression, fwhm: Expression, t0: Expression ')'
+Waveform :: draggaussian '(' duration: Expression, fwhm: Expression, t0: Expression,
+    anh: Expression, alpha: Expression ')'
+Waveform :: erfsquare '(' duration: Expression, risetime: Expression,
+    padleft: Expression, padright: Expression ')'
+```
+
+The meaning of these are as follows
+
+- `flat(duration, iq)` denotes a flat waveform where:
     - `duration` is a rational number representing the duration of the
       waveform in seconds
     - `iq` is a complex number representing the IQ value to play for the
       duration of the waveform
-- `gaussian(duration, fwhm, t0)` creates a Gaussian waveform where:
+- `gaussian(duration, fwhm, t0)` denotes a Gaussian waveform where:
     - `duration` is a rational number representing the duration of the
       waveform in seconds
     - `fwhm` is a rational number representing the full-width-half-max of
       the waveform in seconds
     - `t0` is a rational number representing the center time coordinate of
       the waveform in seconds
-- `draggaussian(duration, fwhm, t0, anh, alpha)` creates a DRAG gaussian pulse where:
+- `draggaussian(duration, fwhm, t0, anh, alpha)` denotes a DRAG gaussian pulse where:
     - `duration` is a rational number representing the duration of the
       waveform in seconds
     - `fwhm` is a rational number representing the full-width-half-max of
@@ -93,8 +135,8 @@ The built-in waveform generators are:
     - `anh` is a rational number representing the anharmonicity of the qubit in
       Hertz
     - `alpha` is a rational number for the dimensionless drag parameter
-- `erfsquare(duration, risetime, padleft, padright)` creates a pulse with a flat
-    top and edges that are error functions (erfs) where:
+- `erfsquare(duration, risetime, padleft, padright)` denotes a pulse with a flat
+    top and edges that are error functions (erf) where:
     - `duration` is a rational number representing the duration of the
       waveform in seconds
     - `risetime` is a rational number representing the rise and fall sections of
@@ -103,32 +145,30 @@ The built-in waveform generators are:
       padding to add to the left of the pulse
     - `padright` is a rational number representing the amount of zero-amplitude
       padding to add to the right of the pulse
+      
+At present, all `Expression` values above must be statically determinable, as template resolution occurs prior to execution time.
 
 #### Defining new waveforms
 
 ```
 SampleRate :: Float
-WaveformDefinition :: DEFWAVEFORM Name ( Parameter+ ) SampleRate : MatrixRow
+WaveformDefinition :: DEFWAVEFORM Name : MatrixRow
 MatrixRow :: Indent (Expression ,)+
 ```
 
-New waveforms may be defined by specifying the sample rate (in Hertz) and listing out all
-the IQ values as complex numbers, separated by commas. Waveform definitions may
-also be parameterized, although note that Quil has no support for vector level
-operations. 
+New waveforms may be defined by by listing out all the IQ values as
+complex numbers, separated by commas.
 
 Example:
 ```
-DEFWAVEFORM my_custom_waveform 6.0:
+DEFWAVEFORM my_custom_waveform:
     1+2i, 3+4i, 5+6i
-
-DEFWAVEFORM my_custom_parameterized_waveform(%a) 6.0:
-    (1+2i)*%a, (3+4i)*%a, (5+6i)*%a
 ```
 
-The duration (in seconds) of a custom waveform may be computed by dividing the
-number of samples by the sample rate. In the above example, both waveforms have
-a duration of 0.5 seconds.
+The duration (in seconds) of a custom waveform applied on a particular
+frame may be computed by dividing the number of samples in the
+waveform by the sample rate of the frame. In the above example, both
+waveforms have a duration of 0.5 seconds.
 
 ### Pulses
 
@@ -143,9 +183,6 @@ Examples:
 # Simple pulse with previously defined waveform
 PULSE 0 "xy" my_custom_waveform
 
-# Pulse with previously defined parameterized waveform
-PULSE 0 "xy" my_custom_parameterized_waveform(0.5)
-
 # Pulse with built-in waveform generator
 PULSE 0 "xy" flat(duration: 1e-6, iq: 2+3i)
 
@@ -159,16 +196,24 @@ corresponding frame's sample rate is undefined.
 
 ### Frame Mutations
 
+The state of a frame may be updated by one of several "frame
+mutations". In what follows, frame mutations may take as arguments
+arbitrary real-valued expressions. However, conforming Quilt
+implementations may restrict the arguments to literal reals, memory
+references, or specific combinations thereof.
+
 #### Frequency
 
 ```
-SetFrequency :: SET-FREQUENCY Frame Float
-ShiftFrequency :: SHIFT-FREQUENCY Frame Float
+SetFrequency :: SET-FREQUENCY Frame Expression
+ShiftFrequency :: SHIFT-FREQUENCY Frame Expression
 ```
 
-Each frame has a frequency which is tracked throughout the program. Initial
-frame frequencies are specified in the frame definition's `INITIAL-FREQUENCY`
-attribute. Subsequent code may update this, either assigning an absolute value (`SET-FREQUENCY`) or a relative offset (`SHIFT-FREQUENCY`).
+Each frame has a real frequency which is tracked throughout the
+program. Initial frame frequencies are specified in the frame
+definition's `INITIAL-FREQUENCY` attribute. Subsequent code may update
+this, either assigning an absolute value (`SET-FREQUENCY`) or a
+relative offset (`SHIFT-FREQUENCY`).
 
 
 ```
@@ -179,18 +224,14 @@ SHIFT-FREQUENCY 0 "ro" 6.1e9
 #### Phase
 
 ```
-SetPhase :: SET-PHASE Frame Float
+SetPhase :: SET-PHASE Frame Expression
 ShiftPhase :: SHIFT-PHASE Frame Expression
 SwapPhases :: SWAP-PHASES Frame Frame
 ```
 
-Each frame has a phase which is tracked throughout the program. Initially the
+Each frame has a real phase which is tracked throughout the program. Initially the
 phase starts out as 0. It may be set or shifted up and down, as well as swapped
 with other frames.
-
-The phase must be a rational real number. There is also support for
-shifted the phase based on some expression, as long as that expression returns
-a real number.
 
 Example:
 ```
@@ -205,10 +246,10 @@ SWAP-PHASE 0 "xy" 1 "xy"
 #### Scale
 
 ```
-SetScale :: SET-SCALE Frame Float
+SetScale :: SET-SCALE Frame Expression
 ```
 
-Each frame has a scale which is tracked throughout the program. Initially the
+Each frame has a real scale which is tracked throughout the program. Initially the
 scale starts out as 1.
 
 Example:
@@ -237,15 +278,12 @@ Example:
 ```
 # Simple capture of an IQ point
 DECLARE iq REAL[2]
-CAPTURE 0 "out" flat(1e-6, 2+3i) iq
+CAPTURE 0 "out" flat(duration: 1e-6, iq: 2+3i) iq
 
 # Raw capture
-DECLARE iqs REAL[400] # length needs to be determined based on the sample rate
-CAPTURE 0 "out" 200e-6 iqs
+DECLARE iqs REAL[400] # length needs to be determined based on the sample rate of the `0 "out"` frame
+RAW-CAPTURE 0 "out" 200e-6 iqs
 ```
-
-The behavior of a `CAPTURE` instruction with a custom waveform whose sample rate
-does not match the corresponding frame's sample rate is undefined.
 
 **Defining Calibrations**
 
@@ -253,7 +291,7 @@ does not match the corresponding frame's sample rate is undefined.
 
 ```
 GateModifier :: CONTROLLED | DAGGER | FORKED
-CalibrationDefinition :: DEFCAL OpModifier* Name ( Parameter+ ) Qubit+ : Instruction+
+CalibrationDefinition :: DEFCAL GateModifier* Name ( Parameter+ ) Qubit+ : Instruction+
 MeasureCalibrationDefinition :: DEFCAL Name Qubit? Parameter : Instruction+
 ```
 
@@ -287,7 +325,8 @@ DEFCAL X 0:
 
 # Parameterized gate on qubit 0
 DEFCAL RX(%theta) 0:
-    PULSE 0 "xy" flat(duration: 1e-6, iq: 2+3i)*%theta/(2*pi)
+    SET-SCALE 0 "xy" %theta/(2*pi)
+    PULSE 0 "xy" flat(duration: 1e-6, iq: 2+3i)
 
 # Applying RZ to any qubit
 DEFCAL RZ(%theta) %qubit:
@@ -296,7 +335,7 @@ DEFCAL RZ(%theta) %qubit:
 # Measurement and classification
 DEFCAL MEASURE 0 %dest:
     DECLARE iq REAL[2]
-    CAPTURE 0 "out" flat(1e-6, 2+3i) iq
+    CAPTURE 0 "out" flat(duration: 1e-6, iq: 2+3i) iq
     LT %dest iq[0] 0.5 # thresholding
 ```
 
@@ -336,7 +375,7 @@ unaffected.
 
 Fence ensures that all operations involving the specified qubits that follow the
 fence statement happen after all operations involving the specified qubits that
-preceed the fence statement. If no qubits are specified, the `FENCE` operation
+precede the fence statement. If no qubits are specified, the `FENCE` operation
 implicitly applies to all qubits on the device.
 
 Examples:
